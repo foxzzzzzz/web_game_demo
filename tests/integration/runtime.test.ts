@@ -15,15 +15,15 @@ const config: RuntimeConfig = {
   camera: { alpha: -1.2, beta: 1.1, radius: 16, targetHeight: 1 },
   input: { pointerTurnSensitivity: 0.01 },
   enemies: [
-    { id: 'small-melee', kind: 'smallMelee', bodySize: 'small', spawn: { x: 12, z: 0 }, maxHealth: 20, moveSpeed: 3, aggroRange: 20, attackRange: 2, attackIntervalMs: 1000, attackDamage: 8, physicalDamageReduction: 0, venomDamageReduction: 0, characterXp: 120, skillXp: 30, respawnDelayMs: 500 },
-    { id: 'medium-ranged', kind: 'mediumRanged', bodySize: 'medium', spawn: { x: -12, z: 0 }, maxHealth: 30, moveSpeed: 2, aggroRange: 20, attackRange: 8, attackIntervalMs: 1500, attackDamage: 10, physicalDamageReduction: 0, venomDamageReduction: 0, characterXp: 180, skillXp: 40, respawnDelayMs: 750 },
-    { id: 'large-elite', kind: 'largeElite', bodySize: 'large', spawn: { x: 0, z: 12 }, maxHealth: 100, moveSpeed: 1.5, aggroRange: 24, attackRange: 3, attackIntervalMs: 2000, attackDamage: 16, physicalDamageReduction: 0, venomDamageReduction: 0, characterXp: 3400, skillXp: 120, respawnDelayMs: 1000, objectiveId: 'defeat-elite' },
+    { id: 'small-melee', kind: 'smallMelee', bodySize: 'small', visual: { name: '沼泽鼠', model: 'marshRat', scale: 1, color: { r: 0.36, g: 0.2, b: 0.14 }, accentColor: { r: 0.62, g: 0.38, b: 0.3 }, detailColor: { r: 0.08, g: 0.04, b: 0.03 } }, spawn: { x: 12, z: 0 }, maxHealth: 20, moveSpeed: 3, collisionRadius: 0.55, aggroRange: 20, attackRange: 2, attackIntervalMs: 1000, attackDamage: 8, physicalDamageReduction: 0, venomDamageReduction: 0, characterXp: 120, skillXp: 30, respawnDelayMs: 500 },
+    { id: 'medium-ranged', kind: 'mediumRanged', bodySize: 'medium', visual: { name: '棘刺蜥', model: 'thornLizard', scale: 1, color: { r: 0.28, g: 0.42, b: 0.12 }, accentColor: { r: 0.64, g: 0.55, b: 0.16 }, detailColor: { r: 0.06, g: 0.08, b: 0.03 } }, spawn: { x: -12, z: 0 }, maxHealth: 30, moveSpeed: 2, collisionRadius: 0.75, aggroRange: 20, attackRange: 8, attackIntervalMs: 1500, attackDamage: 10, physicalDamageReduction: 0, venomDamageReduction: 0, characterXp: 180, skillXp: 40, respawnDelayMs: 750 },
+    { id: 'large-elite', kind: 'largeElite', bodySize: 'large', visual: { name: '荒野巨蜥王', model: 'ancientMonitor', scale: 1, color: { r: 0.24, g: 0.34, b: 0.1 }, accentColor: { r: 0.48, g: 0.47, b: 0.18 }, detailColor: { r: 0.05, g: 0.07, b: 0.02 } }, spawn: { x: 0, z: 12 }, maxHealth: 100, moveSpeed: 1.5, collisionRadius: 1.15, aggroRange: 24, attackRange: 3, attackIntervalMs: 2000, attackDamage: 16, physicalDamageReduction: 0, venomDamageReduction: 0, characterXp: 3400, skillXp: 120, respawnDelayMs: 1000, objectiveId: 'defeat-elite' },
   ],
 };
 
-function createRuntime(events: RuntimeEvent[] = [], random?: () => number): BabylonGameRuntime {
+function createRuntime(events: RuntimeEvent[] = [], random?: () => number, runtimeConfig: RuntimeConfig = config): BabylonGameRuntime {
   return new BabylonGameRuntime({
-    config,
+    config: runtimeConfig,
     engineFactory: () => new NullEngine(),
     autoStartRenderLoop: false,
     random,
@@ -79,6 +79,37 @@ describe('BabylonGameRuntime', () => {
     expect(runtime.isMounted).toBe(false);
   });
 
+  it('TC-RUNTIME-023 builds recognizable low-poly body parts for each named enemy archetype', () => {
+    const engine = new NullEngine();
+    const runtime = new BabylonGameRuntime({ config, engineFactory: () => engine, autoStartRenderLoop: false });
+    runtime.mount();
+    const scene = engine.scenes[0];
+    const meshNames = scene.meshes.map((mesh) => mesh.name);
+    runtime.destroy();
+
+    expect(meshNames).toContain('enemy-small-melee-rat-head');
+    expect(meshNames).toContain('enemy-small-melee-rat-ear-left');
+    expect(meshNames).toContain('enemy-small-melee-rat-tail');
+    expect(meshNames).toContain('enemy-medium-ranged-lizard-head');
+    expect(meshNames).toContain('enemy-medium-ranged-lizard-spike-0');
+    expect(meshNames).toContain('enemy-medium-ranged-lizard-leg-front-left');
+    expect(meshNames).toContain('enemy-large-elite-monitor-head');
+    expect(meshNames).toContain('enemy-large-elite-monitor-leg-front-left');
+    expect(meshNames).toContain('enemy-large-elite-monitor-tail-2');
+  });
+
+  it('TC-RUNTIME-024 renders every named enemy part as a voxel box', () => {
+    const engine = new NullEngine();
+    const runtime = new BabylonGameRuntime({ config, engineFactory: () => engine, autoStartRenderLoop: false });
+    runtime.mount();
+    const enemyParts = engine.scenes[0].meshes.filter((mesh) => mesh.name.startsWith('enemy-'));
+    const vertexCounts = enemyParts.map((mesh) => mesh.getTotalVertices());
+    runtime.destroy();
+
+    expect(enemyParts.length).toBeGreaterThan(20);
+    expect(vertexCounts.every((count) => count === 24)).toBe(true);
+  });
+
   it('TC-RUNTIME-002 moves by WASD without crossing the configured obstacle or world boundary', () => {
     const events: RuntimeEvent[] = [];
     const runtime = createRuntime(events);
@@ -91,6 +122,34 @@ describe('BabylonGameRuntime', () => {
     expect(runtime.playerPosition.x).toBeLessThan(2);
     expect(events.some((event) => event.type === 'collision')).toBe(true);
     runtime.destroy();
+  });
+
+  it('TC-RUNTIME-022 rotates ground-plane WASD movement with the mouse-controlled camera', () => {
+    const canvas = document.createElement('canvas');
+    const runtime = createRuntime([], undefined, { ...config, camera: { ...config.camera, alpha: -Math.PI / 2 } });
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: canvas });
+    runtime.mount(canvas);
+    runtime.setPlayerPosition({ x: -5, z: 0 });
+
+    runtime.setInputState({ w: true });
+    runtime.tick(500);
+    runtime.setInputState({ w: false });
+    expect(runtime.playerPosition.x).toBeCloseTo(-5);
+    expect(runtime.playerPosition.z).toBeCloseTo(5);
+
+    const turnRight = new PointerEvent('pointermove');
+    Object.defineProperty(turnRight, 'movementX', { value: -Math.PI / 2 / config.input.pointerTurnSensitivity });
+    canvas.dispatchEvent(turnRight);
+    runtime.setPlayerPosition({ x: -5, z: 0 });
+    runtime.setInputState({ w: true, d: true });
+    runtime.tick(1000);
+    runtime.setInputState({ w: false, d: false });
+
+    expect(runtime.playerPosition.x).toBeCloseTo(-5 - Math.SQRT1_2 * config.player.moveSpeed);
+    expect(runtime.playerPosition.z).toBeCloseTo(Math.SQRT1_2 * config.player.moveSpeed);
+    expect(Math.hypot(runtime.playerPosition.x + 5, runtime.playerPosition.z)).toBeCloseTo(config.player.moveSpeed);
+    runtime.destroy();
+    Object.defineProperty(document, 'pointerLockElement', { configurable: true, value: null });
   });
 
   it('TC-RUNTIME-003 adapts attack, pause, AI attack, and player-death events', () => {
@@ -275,6 +334,30 @@ describe('BabylonGameRuntime', () => {
     runtime.destroy();
   });
 
+  it('TC-RUNTIME-025 stops a chasing enemy before an obstacle even when one tick crosses it', () => {
+    const runtime = createRuntime();
+    const collisionRadius = config.enemies.find((enemy) => enemy.id === 'small-melee')!.collisionRadius;
+    runtime.mount();
+    runtime.setPlayerPosition({ x: -5, z: 0 });
+
+    runtime.tick(5000);
+
+    expect(runtime.enemyPosition('small-melee')?.x).toBeGreaterThanOrEqual(3.5 + collisionRadius);
+    runtime.destroy();
+  });
+
+  it('TC-RUNTIME-026 stops a wandering enemy before an obstacle even when its endpoint is clear', () => {
+    const runtime = createRuntime([], () => 0.75);
+    const collisionRadius = config.enemies.find((enemy) => enemy.id === 'small-melee')!.collisionRadius;
+    runtime.mount();
+    runtime.setEnemyWandering('small-melee', 10001);
+
+    runtime.tick(5000);
+
+    expect(runtime.enemyPosition('small-melee')?.x).toBeGreaterThanOrEqual(3.5 + collisionRadius);
+    runtime.destroy();
+  });
+
   it('TC-RUNTIME-013 clears enemy restrictions on death/respawn and blocks player movement/actions while synchronized', () => {
     const events: RuntimeEvent[] = [];
     const runtime = createRuntime(events);
@@ -333,7 +416,8 @@ describe('BabylonGameRuntime', () => {
     runtime.setInputState({ w: true });
     runtime.tick(100);
     runtime.setInputState({ w: false });
-    expect(runtime.playerPosition).toEqual({ x: -5, z: 0.8 });
+    expect(runtime.playerPosition.x).toBeCloseTo(-5 - Math.cos(config.camera.alpha) * 0.8);
+    expect(runtime.playerPosition.z).toBeCloseTo(-Math.sin(config.camera.alpha) * 0.8);
     runtime.destroy();
   });
 

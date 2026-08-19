@@ -33,7 +33,7 @@ export function GameApp() {
     selectedBranchId,
     activePanel,
     target: runtimeTarget ? {
-      name: runtimeConfig.enemies.find((enemy) => enemy.id === runtimeTarget.id)?.kind === 'largeElite' ? '荒野巨蜥王' : '荒野猎物',
+      name: runtimeConfig.enemies.find((enemy) => enemy.id === runtimeTarget.id)?.visual.name ?? runtimeTarget.id,
       health: runtimeTarget.health,
       maxHealth: runtimeTarget.maxHealth,
       statuses: (run.enemyStatuses[runtimeTarget.id]?.statuses ?? []).map((status) => ({

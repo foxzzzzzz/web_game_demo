@@ -17,6 +17,21 @@ describe('enemy defense damage resolution', () => {
     expect(() => validateRuntimeConfig({ ...runtimeConfig, enemies: [{ ...runtimeConfig.enemies[0], physicalDamageReduction: 1 }] })).toThrow('物理伤害减免');
   });
 
+  it('configures a distinct name and model for every enemy and rejects invalid visual values', () => {
+    expect(runtimeConfig.enemies.map((enemy) => [enemy.visual.name, enemy.visual.model])).toEqual([
+      ['沼泽鼠', 'marshRat'],
+      ['棘刺蜥', 'thornLizard'],
+      ['荒野巨蜥王', 'ancientMonitor'],
+    ]);
+    expect(() => validateRuntimeConfig({ ...runtimeConfig, enemies: [{ ...runtimeConfig.enemies[0], visual: { ...runtimeConfig.enemies[0].visual, scale: 0 } }] })).toThrow('模型缩放');
+    expect(() => validateRuntimeConfig({ ...runtimeConfig, enemies: [{ ...runtimeConfig.enemies[0], visual: { ...runtimeConfig.enemies[0].visual, color: { ...runtimeConfig.enemies[0].visual.color, r: 1.1 } } }] })).toThrow('模型颜色');
+  });
+
+  it('requires every enemy to declare a positive collision radius', () => {
+    expect(runtimeConfig.enemies.every((enemy) => enemy.collisionRadius > 0)).toBe(true);
+    expect(() => validateRuntimeConfig({ ...runtimeConfig, enemies: [{ ...runtimeConfig.enemies[0], collisionRadius: 0 }] })).toThrow('碰撞半径');
+  });
+
   it('resolves physical, venom and split damage using external reductions without a skill-id branch', () => {
     expect(resolveEnemyDamage({ amount: 100, damageType: 'physical', target })).toBe(70);
     expect(resolveEnemyDamage({ amount: 100, damageType: 'venom', target })).toBe(80);

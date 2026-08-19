@@ -15,11 +15,17 @@ import type { EnemyRuntimeConfig, InputState, RuntimeAreaHazard, RuntimeDecoy, R
 
 interface EnemyEntity {
   config: EnemyRuntimeConfig;
-  mesh?: Mesh;
+  mesh?: TransformNode;
   lastAttackAtMs: number;
   health: number;
   isAlive: boolean;
   respawnAtMs?: number;
+}
+
+interface EnemyModelMaterials {
+  primary: StandardMaterial;
+  accent: StandardMaterial;
+  detail: StandardMaterial;
 }
 
 interface ActiveStatusVisual extends RuntimeStatusVisual {
@@ -483,10 +489,13 @@ export class BabylonGameRuntime {
 
   private spawnEnemy(scene: Scene, enemy: EnemyEntity): void {
     const { config } = enemy;
-    const dimensions = config.kind === 'largeElite' ? { diameter: 3, segments: 6 } : { diameter: config.kind === 'mediumRanged' ? 1.8 : 1.2, segments: 5 };
-    const mesh = MeshBuilder.CreatePolyhedron(`enemy-${config.id}`, { type: config.kind === 'largeElite' ? 2 : 1, size: dimensions.diameter }, scene);
-    mesh.position.set(config.spawn.x, dimensions.diameter / 2, config.spawn.z);
-    mesh.material = this.material(scene, `enemy-material-${config.id}`, config.kind === 'largeElite' ? new Color3(0.65, 0.18, 0.12) : config.kind === 'mediumRanged' ? new Color3(0.62, 0.42, 0.12) : new Color3(0.48, 0.17, 0.48));
+    const materials = {
+      primary: this.enemyMaterial(scene, `enemy-material-${config.id}-primary`, config.visual.color),
+      accent: this.enemyMaterial(scene, `enemy-material-${config.id}-accent`, config.visual.accentColor),
+      detail: this.enemyMaterial(scene, `enemy-material-${config.id}-detail`, config.visual.detailColor),
+    };
+    const mesh = this.createEnemyModel(scene, config, materials);
+    mesh.position.set(config.spawn.x, 0, config.spawn.z);
     enemy.mesh = mesh;
     enemy.health = config.maxHealth;
     enemy.isAlive = true;
@@ -494,6 +503,82 @@ export class BabylonGameRuntime {
     this.enemyRestrictions.delete(config.id);
     this.randomTargetingEnemies.delete(config.id);
     enemy.lastAttackAtMs = this.elapsedMs - config.attackIntervalMs;
+  }
+
+  private createEnemyModel(scene: Scene, config: EnemyRuntimeConfig, materials: EnemyModelMaterials): TransformNode {
+    const root = new TransformNode(`enemy-${config.id}`, scene);
+    root.scaling.setAll(config.visual.scale);
+    const prefix = `enemy-${config.id}`;
+    if (config.visual.model === 'marshRat') this.createMarshRat(scene, root, prefix, materials);
+    else if (config.visual.model === 'thornLizard') this.createThornLizard(scene, root, prefix, materials);
+    else if (config.visual.model === 'ancientMonitor') this.createAncientMonitor(scene, root, prefix, materials);
+    else this.enemyBox(scene, root, `${prefix}-generic-body`, new Vector3(0, 0.7, 0), new Vector3(1, 1, 1), materials.primary);
+    return root;
+  }
+
+  private createMarshRat(scene: Scene, root: TransformNode, prefix: string, materials: EnemyModelMaterials): void {
+    this.enemyBox(scene, root, `${prefix}-rat-body`, new Vector3(0, 0.58, 0), new Vector3(1.05, 0.72, 1.45), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-rat-head`, new Vector3(0, 0.68, 1.05), new Vector3(0.9, 0.78, 0.72), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-rat-snout`, new Vector3(0, 0.56, 1.55), new Vector3(0.5, 0.42, 0.42), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-rat-ear-left`, new Vector3(-0.32, 1.22, 0.95), new Vector3(0.28, 0.46, 0.2), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-rat-ear-right`, new Vector3(0.32, 1.22, 0.95), new Vector3(0.28, 0.46, 0.2), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-rat-eye-left`, new Vector3(-0.28, 0.82, 1.43), new Vector3(0.14, 0.14, 0.08), materials.detail);
+    this.enemyBox(scene, root, `${prefix}-rat-eye-right`, new Vector3(0.28, 0.82, 1.43), new Vector3(0.14, 0.14, 0.08), materials.detail);
+    this.enemyBox(scene, root, `${prefix}-rat-tail`, new Vector3(0, 0.48, -1.05), new Vector3(0.22, 0.22, 0.75), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-rat-tail-1`, new Vector3(0.18, 0.48, -1.65), new Vector3(0.2, 0.2, 0.55), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-rat-tail-2`, new Vector3(0.36, 0.48, -2.05), new Vector3(0.16, 0.16, 0.35), materials.accent);
+  }
+
+  private createThornLizard(scene: Scene, root: TransformNode, prefix: string, materials: EnemyModelMaterials): void {
+    this.enemyBox(scene, root, `${prefix}-lizard-body`, new Vector3(0, 0.62, 0), new Vector3(1.45, 0.72, 2.0), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-lizard-head`, new Vector3(0, 0.68, 1.35), new Vector3(1.05, 0.72, 0.82), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-lizard-snout`, new Vector3(0, 0.57, 1.94), new Vector3(0.78, 0.44, 0.58), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-lizard-eye-left`, new Vector3(-0.38, 0.82, 1.75), new Vector3(0.13, 0.13, 0.08), materials.detail);
+    this.enemyBox(scene, root, `${prefix}-lizard-eye-right`, new Vector3(0.38, 0.82, 1.75), new Vector3(0.13, 0.13, 0.08), materials.detail);
+    this.createLizardLegs(scene, root, `${prefix}-lizard`, 0.95, 0.68, materials);
+    this.createVoxelTail(scene, root, `${prefix}-lizard`, 1.25, 0.5, materials.primary);
+    [-0.62, 0, 0.62].forEach((z, index) => this.enemyBox(scene, root, `${prefix}-lizard-spike-${index}`, new Vector3(0, 1.28, z), new Vector3(0.28, 0.58, 0.28), materials.accent));
+  }
+
+  private createAncientMonitor(scene: Scene, root: TransformNode, prefix: string, materials: EnemyModelMaterials): void {
+    this.enemyBox(scene, root, `${prefix}-monitor-body`, new Vector3(0, 0.9, 0), new Vector3(2.35, 1.0, 3.2), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-monitor-neck`, new Vector3(0, 0.92, 1.8), new Vector3(1.45, 0.82, 1.05), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-monitor-head`, new Vector3(0, 0.9, 2.6), new Vector3(1.75, 0.9, 1.25), materials.primary);
+    this.enemyBox(scene, root, `${prefix}-monitor-snout`, new Vector3(0, 0.72, 3.45), new Vector3(1.4, 0.58, 0.72), materials.accent);
+    this.enemyBox(scene, root, `${prefix}-monitor-eye-left`, new Vector3(-0.62, 1.08, 3.12), new Vector3(0.18, 0.18, 0.09), materials.detail);
+    this.enemyBox(scene, root, `${prefix}-monitor-eye-right`, new Vector3(0.62, 1.08, 3.12), new Vector3(0.18, 0.18, 0.09), materials.detail);
+    this.createLizardLegs(scene, root, `${prefix}-monitor`, 1.55, 1.05, materials);
+    this.createVoxelTail(scene, root, `${prefix}-monitor`, 2.05, 0.82, materials.primary);
+  }
+
+  private createLizardLegs(scene: Scene, root: TransformNode, prefix: string, x: number, z: number, materials: EnemyModelMaterials): void {
+    for (const [side, direction] of [['left', -1], ['right', 1]] as const) {
+      this.enemyBox(scene, root, `${prefix}-leg-front-${side}`, new Vector3(direction * x, 0.42, z), new Vector3(0.72, 0.36, 0.38), materials.primary);
+      this.enemyBox(scene, root, `${prefix}-foot-front-${side}`, new Vector3(direction * (x + 0.42), 0.2, z + 0.12), new Vector3(0.45, 0.22, 0.5), materials.accent);
+      this.enemyBox(scene, root, `${prefix}-leg-back-${side}`, new Vector3(direction * x, 0.42, -z), new Vector3(0.72, 0.36, 0.38), materials.primary);
+      this.enemyBox(scene, root, `${prefix}-foot-back-${side}`, new Vector3(direction * (x + 0.42), 0.2, -z - 0.12), new Vector3(0.45, 0.22, 0.5), materials.accent);
+    }
+  }
+
+  private createVoxelTail(scene: Scene, root: TransformNode, prefix: string, startZ: number, width: number, material: StandardMaterial): void {
+    this.enemyBox(scene, root, `${prefix}-tail-0`, new Vector3(0, 0.64, -startZ), new Vector3(width, width, 1.25), material);
+    this.enemyBox(scene, root, `${prefix}-tail-1`, new Vector3(0.18, 0.58, -startZ - 1), new Vector3(width * 0.72, width * 0.72, 0.9), material);
+    this.enemyBox(scene, root, `${prefix}-tail-2`, new Vector3(0.34, 0.52, -startZ - 1.72), new Vector3(width * 0.45, width * 0.45, 0.62), material);
+  }
+
+  private enemyBox(scene: Scene, root: TransformNode, name: string, position: Vector3, scaling: Vector3, material: StandardMaterial): Mesh {
+    const part = MeshBuilder.CreateBox(name, { size: 1 }, scene);
+    part.position.copyFrom(position);
+    part.scaling.copyFrom(scaling);
+    part.material = material;
+    part.parent = root;
+    return part;
+  }
+
+  private enemyMaterial(scene: Scene, name: string, color: { r: number; g: number; b: number }): StandardMaterial {
+    const material = this.material(scene, name, new Color3(color.r, color.g, color.b));
+    material.specularColor = Color3.Black();
+    return material;
   }
 
   private updatePlayer(deltaMs: number): void {
@@ -504,8 +589,11 @@ export class BabylonGameRuntime {
     const scale = (this.config.player.moveSpeed * this.playerMoveSpeedMultiplier * deltaMs) / 1000 / length;
     const player = this.requirePlayer();
     const start = { x: player.position.x, z: player.position.z };
-    const candidate = { x: start.x + horizontal * scale, z: start.z + vertical * scale };
-    player.rotation.y = Math.atan2(horizontal, vertical);
+    const cameraAlpha = this.camera!.alpha;
+    const movementX = -vertical * Math.cos(cameraAlpha) - horizontal * Math.sin(cameraAlpha);
+    const movementZ = -vertical * Math.sin(cameraAlpha) + horizontal * Math.cos(cameraAlpha);
+    const candidate = { x: start.x + movementX * scale, z: start.z + movementZ * scale };
+    player.rotation.y = Math.atan2(movementX, movementZ);
     this.movePlayerTo(candidate);
   }
 
@@ -527,7 +615,7 @@ export class BabylonGameRuntime {
       if (wanderUntil > this.elapsedMs) {
         const angle = this.random() * Math.PI * 2;
         const candidate = { x: enemy.mesh.position.x + Math.sin(angle) * enemy.config.moveSpeed * deltaMs / 1000, z: enemy.mesh.position.z + Math.cos(angle) * enemy.config.moveSpeed * deltaMs / 1000 };
-        if (this.isWalkable(candidate, this.config.player.collisionRadius)) { enemy.mesh.position.x = candidate.x; enemy.mesh.position.z = candidate.z; }
+        this.moveEnemyAlongLegalPath(enemy, candidate);
         continue;
       }
       this.enemyWanderUntil.delete(enemy.config.id);
@@ -544,7 +632,8 @@ export class BabylonGameRuntime {
         direction.y = 0;
         direction.normalize();
         enemy.mesh.rotation.y = Math.atan2(direction.x, direction.z);
-        enemy.mesh.position.addInPlace(direction.scale((enemy.config.moveSpeed * modifiers.moveSpeedMultiplier * deltaMs) / 1000));
+        const movement = direction.scale((enemy.config.moveSpeed * modifiers.moveSpeedMultiplier * deltaMs) / 1000);
+        this.moveEnemyAlongLegalPath(enemy, { x: enemy.mesh.position.x + movement.x, z: enemy.mesh.position.z + movement.z });
         continue;
       }
       if (!restrictions.actionDisabled && (this.enemyActionGateUntil.get(enemy.config.id) ?? 0) <= this.elapsedMs && this.elapsedMs - enemy.lastAttackAtMs >= enemy.config.attackIntervalMs / modifiers.attackSpeedMultiplier) {
@@ -653,7 +742,8 @@ export class BabylonGameRuntime {
   }
 
   private statusMaterial(enemy: EnemyEntity): StandardMaterial | undefined {
-    return enemy.mesh?.material instanceof StandardMaterial ? enemy.mesh.material : undefined;
+    const mesh = enemy.mesh?.getChildMeshes().find((child) => child.material instanceof StandardMaterial);
+    return mesh?.material instanceof StandardMaterial ? mesh.material : undefined;
   }
 
   private sampleLegalMovement(start: RuntimePosition, candidate: RuntimePosition, collisionRadius: number): { position: RuntimePosition; collided: boolean } {
@@ -669,6 +759,14 @@ export class BabylonGameRuntime {
       lastWalkable = sampled;
     }
     return { position: candidate, collided: false };
+  }
+
+  private moveEnemyAlongLegalPath(enemy: EnemyEntity, candidate: RuntimePosition): void {
+    if (!enemy.mesh) return;
+    const start = { x: enemy.mesh.position.x, z: enemy.mesh.position.z };
+    const result = this.sampleLegalMovement(start, candidate, enemy.config.collisionRadius);
+    enemy.mesh.position.x = result.position.x;
+    enemy.mesh.position.z = result.position.z;
   }
 
   private isPlayerMovementDisabled(): boolean {

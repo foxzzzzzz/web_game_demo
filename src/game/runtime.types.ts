@@ -16,14 +16,31 @@ export interface RuntimeConfig {
 
 export type EnemyKind = 'smallMelee' | 'mediumRanged' | 'largeElite';
 export type EnemyBodySize = 'small' | 'medium' | 'large';
+export type EnemyModelKind = 'marshRat' | 'thornLizard' | 'ancientMonitor';
 
 export interface EnemyRuntimeConfig {
   id: string;
   kind: EnemyKind;
   bodySize: EnemyBodySize;
+  visual: {
+    /** HUD 中显示的怪物名称。 */
+    name: string;
+    /** 程序化方块体素模型类型。 */
+    model: EnemyModelKind;
+    /** 模型整体缩放倍率。 */
+    scale: number;
+    /** 模型主材质 RGB 分量，范围 [0, 1]。 */
+    color: { r: number; g: number; b: number };
+    /** 耳部、腹部或背刺等辅助部件颜色。 */
+    accentColor: { r: number; g: number; b: number };
+    /** 眼睛、爪部等小型识别部件颜色。 */
+    detailColor: { r: number; g: number; b: number };
+  };
   spawn: { x: number; z: number };
   maxHealth: number;
   moveSpeed: number;
+  /** 怪物在地面移动时使用的圆形碰撞半径，单位：世界单位。 */
+  collisionRadius: number;
   aggroRange: number;
   attackRange: number;
   attackIntervalMs: number;
