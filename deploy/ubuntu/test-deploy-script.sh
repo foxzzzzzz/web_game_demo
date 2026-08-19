@@ -15,10 +15,9 @@ PNPM_VERSION=10
 APP_NAME=reborn-snake
 DEPLOY_ROOT=/var/www/reborn-snake
 HTTP_PORT=80
+CONFIGURE_NGINX=true
 DISABLE_DEFAULT_NGINX_SITE=true
 ASSET_CACHE_DURATION=365d
-GIT_REPOSITORY=https://example.com/example/reborn-snake.git
-GIT_BRANCH=main
 DOMAIN_NAME=''
 ENABLE_HTTPS=false
 LETSENCRYPT_EMAIL=''
@@ -26,14 +25,22 @@ EOF
 bash "$SCRIPT" --config "$CONFIG_FILE" --validate-config | grep -Fq 'Configuration is valid'
 
 for required_text in \
-  'apt-get install -y ca-certificates curl git nginx' \
+  'apt-get install -y ca-certificates curl' \
+  "[[ \$CONFIGURE_NGINX == true ]]" \
+  'apt-get install -y nginx' \
   'This script supports Ubuntu only' \
-  'pnpm --dir "$source_dir" install --frozen-lockfile' \
-  'pnpm --dir "$source_dir" build' \
+  'pnpm --dir "$PROJECT_ROOT" install --frozen-lockfile' \
+  'pnpm --dir "$PROJECT_ROOT" build' \
+  'package.json was not found in project root' \
   'nginx -t' \
   'certbot --nginx --non-interactive --agree-tos --redirect --email' \
   'try_files \$uri \$uri/ /index.html'; do
   grep -Fq "$required_text" "$SCRIPT"
 done
+
+if grep -Eq 'git (clone|fetch|checkout|reset)' "$SCRIPT"; then
+  printf 'Unexpected Git source-download command found.\n' >&2
+  exit 1
+fi
 
 printf 'Deployment script static checks passed.\n'
